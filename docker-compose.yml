@@ -1,0 +1,96 @@
+services:
+  airflow-initdb:
+    container_name: airflow-initdb
+    build:
+      context: ./airflow-build
+    volumes:
+      - ./services/airflow:/opt/airflow
+      - ./projects:/opt/airflow-dags
+    entrypoint: /bin/bash
+    # yamllint disable rule:line-length
+    command:
+      - -c
+      - |
+        FILE=/opt/airflow/airflow.db
+        if [ ! -f $${FILE} ]; then
+            echo "Database file $${FILE} not found!"
+            airflow db init
+            airflow users create -u admin -f Ad -l Min -r Admin -e admin@adm.in -p '${AIRFLOW_USER_PASSWORD}'
+        else
+          echo "Database file $${FILE} exists. Skipping database initialization."
+        fi
+  airflow-webserver:
+    container_name: airflow-webserver
+    build:
+      context: ./airflow-build
+    depends_on:
+      - airflow-initdb
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: False
+      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 30
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow-dags
+    volumes:
+      - ./services/airflow:/opt/airflow
+      - ./projects:/opt/airflow-dags
+    ports:
+      - 8080:8080
+      - 8081:8081
+    entrypoint: airflow webserver
+
+  airflow-scheduler:
+    container_name: airflow-scheduler
+    build:
+      context: ./airflow-build
+    depends_on:
+      - airflow-initdb
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: False
+      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 30
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow-dags
+    volumes:
+      - ./services/airflow:/opt/airflow
+      - ./projects:/opt/airflow-dags
+    entrypoint: airflow scheduler
+  minio:
+    container_name:  minio
+    image: quay.io/minio/minio:latest
+    command: server /data --address ":7000" --console-address ":7001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}                 # Set your MinIO access key
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}         # Set your MinIO secret key (must be at least 8 chars)
+    ports:
+      - 7000:7000                                         # MinIO API port
+      - 7001:7001                                         # MinIO Console (web UI) port
+    volumes:
+      - ./services/minio:/data                            # Persist data on host
+  broker:
+    image: apache/kafka:latest
+    container_name: broker
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,BROKER://broker:9094,CONTROLLER://localhost:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,BROKER://broker:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,BROKER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+    ports:
+      - 9092:9092
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    container_name: clickhouse
+    ports:
+      - 8123:8123
+      - 9000:9000
+    volumes:
+      - ./services/clickhouse-data:/var/lib/clickhouse
+      - ./services/clickhouse-logs:/var/log/clickhouse-server
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DB: data
