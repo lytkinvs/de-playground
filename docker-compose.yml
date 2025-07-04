@@ -1,28 +1,29 @@
+
 services:
   airflow-initdb:
     container_name: airflow-initdb
     build:
-      context: ./airflow-build
+      context: ./build/airflow
     volumes:
-      - ./services/airflow:/opt/airflow
-      - ./projects:/opt/airflow-dags
+      - ${AIRFLOW_CODE_PATH}:/opt/airflow
+      - ${AIRFLOW_DAGS_PATH}:/opt/airflow-dags
     entrypoint: /bin/bash
-    # yamllint disable rule:line-length
     command:
       - -c
       - |
-        FILE=/opt/airflow/airflow.db
+        FILE=${AIRFLOW_DB_FILE}
         if [ ! -f $${FILE} ]; then
             echo "Database file $${FILE} not found!"
             airflow db init
-            airflow users create -u admin -f Ad -l Min -r Admin -e admin@adm.in -p '${AIRFLOW_USER_PASSWORD}'
+            airflow users create -u ${AIRFLOW_ADMIN_USERNAME} -f ${AIRFLOW_ADMIN_FIRSTNAME} -l ${AIRFLOW_ADMIN_LASTNAME} -r Admin -e ${AIRFLOW_ADMIN_EMAIL} -p '${AIRFLOW_ADMIN_PASSWORD}'
         else
           echo "Database file $${FILE} exists. Skipping database initialization."
         fi
+
   airflow-webserver:
     container_name: airflow-webserver
     build:
-      context: ./airflow-build
+      context: ./build/airflow
     depends_on:
       - airflow-initdb
     environment:
@@ -30,17 +31,17 @@ services:
       AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 30
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow-dags
     volumes:
-      - ./services/airflow:/opt/airflow
-      - ./projects:/opt/airflow-dags
+      - ${AIRFLOW_CODE_PATH}:/opt/airflow
+      - ${AIRFLOW_DAGS_PATH}:/opt/airflow-dags
     ports:
-      - 8080:8080
-      - 8081:8081
+      - ${AIRFLOW_WEBSERVER_PORT}:${AIRFLOW_WEBSERVER_PORT}
+      - ${AIRFLOW_WEBSERVER_DEBUG_PORT}:${AIRFLOW_WEBSERVER_DEBUG_PORT}
     entrypoint: airflow webserver
 
   airflow-scheduler:
     container_name: airflow-scheduler
     build:
-      context: ./airflow-build
+      context: ./build/airflow
     depends_on:
       - airflow-initdb
     environment:
@@ -48,21 +49,22 @@ services:
       AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 30
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow-dags
     volumes:
-      - ./services/airflow:/opt/airflow
-      - ./projects:/opt/airflow-dags
+      - ${AIRFLOW_CODE_PATH}:/opt/airflow
+      - ${AIRFLOW_DAGS_PATH}:/opt/airflow-dags
     entrypoint: airflow scheduler
+
   minio:
     container_name:  minio
     image: quay.io/minio/minio:latest
-    command: server /data --address ":7000" --console-address ":7001"
+    command: server ${MINIO_DATA_PATH} --address ":${MINIO_API_PORT}" --console-address ":${MINIO_CONSOLE_PORT}"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}                 # Set your MinIO access key
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}         # Set your MinIO secret key (must be at least 8 chars)
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - 7000:7000                                         # MinIO API port
-      - 7001:7001                                         # MinIO Console (web UI) port
+      - ${MINIO_API_PORT}:${MINIO_API_PORT}
+      - ${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}
     volumes:
-      - ./services/minio:/data                            # Persist data on host
+      - ${MINIO_DATA_PATH}:/data                          # Persist data on host
   broker:
     image: apache/kafka:latest
     container_name: broker
@@ -80,24 +82,24 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 3
     ports:
-      - 9092:9092
+      - ${KAFKA_PORT}:${KAFKA_PORT}
   clickhouse:
     image: clickhouse/clickhouse-server
     container_name: clickhouse
     ports:
-      - 8123:8123
-      - 9000:9000
+      - ${CLICKHOUSE_HTTP_PORT}:8123
+      - ${CLICKHOUSE_TCP_PORT}:9000
     volumes:
-      - ./services/clickhouse-data:/var/lib/clickhouse
-      - ./services/clickhouse-logs:/var/log/clickhouse-server
+      - ${CLICKHOUSE_DATA_PATH}:/var/lib/clickhouse
+      - ${CLICKHOUSE_LOG_PATH}:/var/log/clickhouse-server
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
-      CLICKHOUSE_DB: data
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
 
   superset:
     build:
-      context: ./superset
+      context: ./build/superset
     container_name: superset
     environment:
       ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME}
@@ -105,6 +107,6 @@ services:
       ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL}
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
     ports:
-      - 8088:8088
+      - ${SUPERSET_PORT}:8088
     volumes:
-      - ./services/superset:/app/superset_home
+      - ${SUPERSET_HOME_PATH}:/app/superset_home
