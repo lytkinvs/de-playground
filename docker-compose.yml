@@ -94,3 +94,17 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DB: data
+
+  superset:
+    build:
+      context: ./superset
+    container_name: superset
+    environment:
+      ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
+      ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL}
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    ports:
+      - 8088:8088
+    volumes:
+      - ./services/superset:/app/superset_home
