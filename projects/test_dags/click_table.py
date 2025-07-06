@@ -19,7 +19,7 @@ def click_create_table():
 
     records = ch_hook.execute(
         '''
-            CREATE TABLE example_table
+            CREATE TABLE IF NOT EXISTS example_table
             (
                 uid String,
                 gender_age String,

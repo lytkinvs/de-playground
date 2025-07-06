@@ -31,7 +31,7 @@ This command will wait for input at a `>` prompt. Enter `hello`, press `Ente
 Now read the events in the `test-topic` topic from the beginning of the log:
 
 ```bash
-./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test-topic --from-beginning
+./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic customer_log --from-beginning
 ```
 
 You will see the two strings that you previously produced:

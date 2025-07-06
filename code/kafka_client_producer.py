@@ -1,4 +1,4 @@
-from confluent_kafka import Producer
+from kafka import KafkaProducer
 from pydantic import BaseModel
 
 
@@ -7,25 +7,18 @@ class PushModel(BaseModel):
     level: str
     message: str
 
-conf = {
-    'bootstrap.servers': '127.0.0.1:9092',
-}
-producer = Producer(conf)
-topic= 'topic'
+producer = KafkaProducer(
+    bootstrap_servers='localhost:9092',
+    value_serializer=lambda v: v.encode('utf-8'),
+)
 
-def delivery_report(err, msg):
-    if err:
-        print(f"Failed to deliver message: {err}")
-    else:
-        print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
+for i in range(1000):
+    topic= 'customer_log'
+    value = PushModel(
+        timestamp=1234567890,
+        level='INFO',
+        message='This is a test message'
+    )
 
-def send_messages(producer, keys):
-    for key in keys:
-        value = PushModel(timestamp=1234, level="test", message="test")
-        producer.produce(topic, value.model_dump_json(), key=key, callback=delivery_report)
-    producer.flush()
-
-if __name__ == "__main__":
-    keys = ['Amy', 'Brenda', 'Cindy']
-    keys = ['1']
-    send_messages(producer, keys)
+    producer.send(topic, value.model_dump_json())
+producer.flush()
