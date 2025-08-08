@@ -3,4 +3,5 @@ services/*
 .idea
 .DS_Store
 
+
 # Ignore all files in the airflow home directory except for the ones we want to keep
